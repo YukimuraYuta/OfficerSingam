@@ -1,0 +1,6 @@
+make a folder and make 3 files : 1st named app where all the code will be,
+2nd data where the veideo will be stored
+3rd requirements file:ultralytics
+opencv-python-headless
+numpy
+filterpy
