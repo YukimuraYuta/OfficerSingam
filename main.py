@@ -4,7 +4,8 @@ from app.tracker import SimpleTracker
 from app.rules import ZoneMonitor
 from pathlib import Path
 
-VIDEO_SOURCE = str(Path("data/sample_video.mp4"))
+# Use '0' for the live camera feed
+VIDEO_SOURCE = 0 
 
 def draw_zone(frame, poly):
     pts = np.array(poly, dtype=np.int32)
@@ -15,29 +16,49 @@ def main():
     tracker = SimpleTracker()
     zone = [(100,100),(500,100),(500,400),(100,400)]
     rules = ZoneMonitor(zone, loiter_seconds=8)
+    
     cap = cv2.VideoCapture(VIDEO_SOURCE)
+    
+    if not cap.isOpened():
+        print("Error: Could not open video device (Camera).")
+        return
+
     start = time.time()
     while True:
         ret, frame = cap.read()
-        if not ret: break
+        if not ret: 
+            print("Error: Failed to receive frame from camera stream or end of file reached.")
+            break
+            
         t = time.time() - start
+        
+        # 1. Detection (returns 6-item tuples)
         dets = det.detect(frame)
         dets = [d for d in dets if d[5] == 0]  # keep only person class (COCO id 0)
+        
+        # 2. Tracking (returns a LIST of 4-item tuples: [(oid, bbox_4_tuple, cls, conf), ...])
         tracked = tracker.update(dets)
-        for oid,bbox,cls,conf in tracked:
-            x1,y1,x2,y2 = bbox
+        
+        # 3. Visualization Loop (FIX: Iterate directly over the list and unpack the 4 items)
+        for oid, bbox, cls, conf in tracked:
+            x1, y1, x2, y2 = bbox
             cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,0),2)
             cv2.putText(frame,f"ID{oid}",(x1,y1-8),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),2)
+            
         draw_zone(frame, zone)
-        events = rules.update(tracked, t)
+        
+        # 4. Rules Monitor (receives the same list format)
+        events = rules.update(tracked, t) 
+        
         for i,e in enumerate(events):
             print(f"[{t:.1f}s] {e}")
             cv2.putText(frame, e, (10,30+i*20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255),2)
+            
         cv2.imshow("CCTV AI", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+            
     cap.release(); cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
-
